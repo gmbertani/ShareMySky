@@ -2,7 +2,7 @@
 Application code for UAI-IARA project Share My Sky 
 Original code by Thomas Mazzi  thomasmazzi74@gmail.com 
 
-Introduction
+## Introduction
 Imagine being in an unknown city without a map or needing help.
 It would be difficult to orient yourself or give directions to the place,
 right? GPS (Global Positioning System) is a bit like a super
@@ -37,7 +37,7 @@ thickness of the ionosphere.
 All this means GPS positioning errors and lack of
 security.
 
-The goal
+## The goal
 Everything about the GPS signal is known at all times, it is all well described in the
 specifications. It is therefore possible to receive a GPS signal from a satellite and
 compare this with what is expected. The difference between the expected signal
@@ -51,7 +51,7 @@ better understand this magical world, with the dual objective of being able to
 understand more about space weather and contribute to the improvement of the
 GPS system.
 
-The experiment
+## The experiment
 In order to achieve the objective described above, the idea would be to
 involve associations and people first, but to do this it is necessary to be able to perform measurements 
 at low costs, with small spaces, accessible to
@@ -90,7 +90,7 @@ with a simple excel or with a more advanced matlab or python. The choice of
 the system depends on the user who, once the sw has been developed, can share it
 with others.
 
-In Conclusion
+## In Conclusion
 If you want to participate in this experiment you need to have:
 1. a place with a minimum of sky available, even a
 window in the city is fine
