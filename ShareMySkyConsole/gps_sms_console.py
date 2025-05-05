@@ -10,6 +10,7 @@ For more information, see the LICENSE file or visit https://www.gnu.org/licenses
 import serial
 import argparse
 import sys
+from datetime import datetime, timedelta
 from pathlib import Path
 
 
@@ -137,6 +138,19 @@ def readgps(ser):
     return s
 
 
+def fixDate(date: str):
+    # correzione data per GPS vecchi
+    rollover_date = datetime(2019, 4, 6)  # ok fino al 2038
+    data_originale = datetime.strptime(date, "%d%m%y")
+
+    if data_originale < rollover_date:
+        data_corretta = data_originale + timedelta(weeks=1024)
+    else:
+        data_corretta = data_originale
+
+    return data_corretta.strftime("%d%m%y")
+
+
 def main():
     args = parse_arguments()
 
@@ -167,12 +181,14 @@ def main():
 
             # decodifica il codice nmea0183 GPRMC per avere latitudine longitudine e l'orario gps
             if s[0] == '$GPRMC':
-                timesat_old = s[9][4:6] + s[9][2:4] + s[9][0:2] + s[1][:-5]
                 if len(s[1]) == 6:
+                    s[9] = fixDate(s[9])
                     # orario senza millisecondi, per dispositivi vecchi
                     second = s[1][4:6]
+                    timesat_old = s[9][4:6] + s[9][2:4] + s[9][0:2] + s[1][0:2] + s[1][2:4]
                 else:
                     second = s[1][-5:-3]
+                    timesat_old = s[9][4:6] + s[9][2:4] + s[9][0:2] + s[1][:-5]
 
                 lat = str(int(float(s[3])) / 100) + " " + s[4]
                 lon = str(int(float(s[5])) / 100) + " " + s[6]
@@ -198,13 +214,17 @@ def main():
 
             # decodifica il codice nmea0183 GPRMC
             if s[0] == '$GPRMC':
-                date = s[9][4:6] + s[9][2:4] + s[9][0:2]
-                timesat = s[9][4:6] + s[9][2:4] + s[9][0:2] + s[1][:-5]
                 if len(s[1]) == 6:
                     # orario senza millisecondi, per dispositivi vecchi
+                    s[9] = fixDate(s[9])
+                    # orario senza millisecondi, per dispositivi vecchi
                     second = s[1][4:6]
+                    timesat = s[9][4:6] + s[9][2:4] + s[9][0:2] + s[1][0:2] + s[1][2:4]
                 else:
                     second = s[1][-5:-3]
+                    timesat = s[9][4:6] + s[9][2:4] + s[9][0:2] + s[1][:-5]
+
+                date = s[9]
 
                 # al secondo 00 esegue la statistica e logga i risultati
                 if second == "00":
