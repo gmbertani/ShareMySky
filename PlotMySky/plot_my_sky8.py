@@ -60,6 +60,8 @@ def plot_snr_vs_time(file_path, azimut_range=None, elevation_range=None, idsat_l
         # 5. Plotta i risultati
         if df['idsat'].nunique() > 0:
             fig, ax = plt.subplots(figsize=(12, 6))
+            
+            '''
             if hasattr(cm, 'get_cmap'):
                 colors = plt.colormaps.get_cmap('tab10')  # Modifica qui
             else:
@@ -70,6 +72,30 @@ def plot_snr_vs_time(file_path, azimut_range=None, elevation_range=None, idsat_l
                 line, = ax.plot(df_idsat['time_num'], df_idsat['cn0'], marker='', linestyle='-', color=colors(i),
                                 label=f'IDSAT {idsat}')
                 lines.append(line)
+            '''
+            unique_idsats = df['idsat'].unique()
+            num_unique_idsats = len(unique_idsats)
+
+            # Scegli una colormap appropriata per un numero elevato di colori, ad esempio 'viridis'
+            # o crea una lista di colori manualmente se preferisci un controllo maggiore.
+            # Per un numero elevato di colori, una colormap sequenziale o diveregente potrebbe non essere l'ideale,
+            # ma colormaps percettivamente uniformi come 'viridis', 'plasma', 'inferno', 'magma'
+            # o colormaps cicliche come 'twilight' possono essere utili.
+            # Per questo caso, potremmo voler spaziare i colori in modo uniforme sull'intera gamma.
+
+            # Esempio usando una colormap con normalizzazione:
+            cmap = plt.colormaps.get_cmap('hsv') # 'hsv' o 'rainbow' sono buone per distinguere molti elementi
+            colors = [cmap(i / num_unique_idsats) for i in range(num_unique_idsats)]
+
+            lines = []
+            # Assicurati che l'ordine dei colori corrisponda all'ordine degli idsat
+            for i, idsat in enumerate(unique_idsats):
+                df_idsat = df[df['idsat'] == idsat]
+                line, = ax.plot(df_idsat['time_num'], df_idsat['cn0'], marker='', linestyle='-', color=colors[i],
+                                         label=f'IDSAT {idsat}')
+                lines.append(line)
+                       
+                
             ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
 
             # Aggiungi il cursore
