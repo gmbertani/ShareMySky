@@ -14,7 +14,7 @@ except ImportError:
 
 
 def plot_snr_vs_time(file_path, azimut_range=None, elevation_range=None, idsat_list=None, max_sats=None,
-                     hours_per_plot=24, cn0_mask=None):  # Aggiunto cn0_mask
+                     hours_per_plot=24, cn0_mask=None, want_max=False):  # Aggiunto cn0_mask
     try:
         df = pd.read_csv(file_path)
         if df.columns[0] != 'timestamp':
@@ -107,10 +107,11 @@ def plot_snr_vs_time(file_path, azimut_range=None, elevation_range=None, idsat_l
 
                 # NUOVA FUNZIONALITÀ: Linea nera tratteggiata per i massimi CN0
                 # Raggruppa per time_num e trova il CN0 massimo per ogni punto temporale
-                max_cn0_per_time = df_plot.groupby('time_num')['cn0'].max().reset_index()
-                ax.plot(max_cn0_per_time['time_num'], max_cn0_per_time['cn0'],
-                        color='black', linestyle='--', label='Max CN0')
-                ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')  # Aggiorna la legenda
+                if want_max:
+                    max_cn0_per_time = df_plot.groupby('time_num')['cn0'].max().reset_index()
+                    ax.plot(max_cn0_per_time['time_num'], max_cn0_per_time['cn0'],
+                            color='black', linestyle='--', label='Max CN0')
+                    ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')  # Aggiorna la legenda
 
                 cursor = Cursor(ax, useblit=True, color='red', linewidth=1)
 
@@ -339,13 +340,15 @@ def main():
     parser.add_argument('--azimut_max', type=float, help='Il valore massimo di azimut.')
     parser.add_argument('--elevation_min', type=float, help='Il valore minimo di elevazione.')
     parser.add_argument('--elevation_max', type=float, help='Il valore massimo di elevazione.')
-    parser.add_argument('--idsat', type=int, nargs='+', help='Lista di IDSAT da considerare.')
+    parser.add_argument('--idsat', type=int, nargs='+', help='Lista di IDSAT da considerare, separati da spazi.')
     parser.add_argument('--max_sats', type=int,
                         help='Numero massimo di satelliti da plottare (in base al numero di dati).')
     parser.add_argument('--hours', type=int, default=24,
                         help='Numero di ore da plottare in ciascun grafico (default: 24).')
     parser.add_argument('--mask', type=float,
-                        help='Valore CN0 minimo. Ignora i valori di CN0 inferiori o uguali a N.')  # NUOVO ARGOMENTO
+                        help='Valore CN0 minimo. Ignora i valori di CN0 inferiori o uguali a N.')  
+    parser.add_argument('--show_max', type=bool,
+                        help='Visualizza il cn0 massimo')  # NUOVO ARGOMENTO
 
     args = parser.parse_args()
 
@@ -357,8 +360,9 @@ def main():
     max_sats = args.max_sats
     hours_per_plot = args.hours
     cn0_mask = args.mask  # Recupera il valore della maschera
+    show_max = args.show_max
 
-    plot_snr_vs_time(args.file_path, azimut_range, elevation_range, idsat_list, max_sats, hours_per_plot, cn0_mask)
+    plot_snr_vs_time(args.file_path, azimut_range, elevation_range, idsat_list, max_sats, hours_per_plot, cn0_mask, show_max)
     plot_s4c_vs_time(args.file_path, azimut_range, elevation_range, idsat_list, max_sats, hours_per_plot, cn0_mask)
 
 
