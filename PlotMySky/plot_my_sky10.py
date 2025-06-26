@@ -15,74 +15,22 @@ except ImportError:
 
 def plot_snr_vs_time(file_path, azimut_range=None, elevation_range=None, idsat_list=None, max_sats=None,
                      hours_per_plot=24, cn0_mask=None):  # Aggiunto cn0_mask
-    # Definisci i tipi di dato e i nomi delle colonne desiderati
-    desired_dtypes = {
-        'timestamp_col': str,
-        'idsat_col': int,
-        'azimuth_col': float,
-        'elevation_col': float,
-        'cn0_col': float,
-        's4c_col': float
-    }
-    temp_col_names = ['timestamp_col', 'idsat_col', 'azimuth_col', 'elevation_col', 'cn0_col', 's4c_col']
-
-    df = None
     try:
-        # Tenta di leggere il file assumendo che ci sia un'intestazione
-        print("Tento di leggere il file con intestazione...")
-        temp_df = pd.read_csv(file_path)
+        df = pd.read_csv(file_path)
+        if df.columns[0] != 'timestamp':
+            # missing header, add a new one:
+            print("This CSV has no header, applying a new one")
+            dtypes = {'timestamp': str, 'idsat': int, 'azimuth': float, 'elevation': float, 'cn0': float,
+                      's4c': float, 'time_num': float}
+            cols = list(dtypes.keys())
+            df = pd.read_csv(file_path, header=None, names=cols, dtype=dtypes)
 
-        # Check if the first column name matches 'timestamp' after initial read
-        if temp_df.columns[0] == 'timestamp':
-            # It seems to have a header with expected names
-            # Directly use the read df, but then rename for consistency with desired_dtypes
-            print("File letto con intestazione 'timestamp'. Applico i tipi.")
-            # Map column names if they are different from temp_col_names but order is same
-            current_col_map = {old_name: new_name for old_name, new_name in zip(temp_df.columns, temp_col_names)}
-            temp_df.rename(columns=current_col_map, inplace=True)
-            df = temp_df
-        else:
-            # If the first column is not 'timestamp', it might be missing header or different header
-            print("La prima colonna non è 'timestamp'. Ritento senza intestazione.")
-            raise ValueError("First column mismatch, retrying without header.")
-
-    except Exception as e:
-        print(f"Errore nella lettura con intestazione o mismatch colonne ({e}). Ritento senza intestazione...")
-        # Se fallisce, tenta di leggere il file assumendo che non ci sia intestazione
-        try:
-            df = pd.read_csv(file_path, header=None, names=temp_col_names)
-            print("File letto senza intestazione. Colonne assegnate.")
-        except Exception as e_no_header:
-            print(f"Errore anche nella lettura senza intestazione: {e_no_header}")
-            print(f"Errore: Impossibile leggere il file '{file_path}' correttamente.")
-            return
-
-    if df is None:
-        print(f"Errore: Impossibile leggere il file '{file_path}'.")
+    except FileNotFoundError:
+        print(f"Errore: File '{file_path}' non trovato.")
         return
 
-    # Applica i tipi di dato definiti, gestendo gli errori per 'idsat' in caso di valori non numerici
-    for col, dtype in desired_dtypes.items():
-        if col in df.columns:
-            if col == 'idsat_col':
-                df[col] = pd.to_numeric(df[col], errors='coerce').astype('Int64')
-            else:
-                df[col] = df[col].astype(dtype, errors='ignore')
-
-    # Rimuovi eventuali righe dove 'idsat_col' è diventato NaN a causa di errori di conversione
-    df.dropna(subset=['idsat_col'], inplace=True)
-
-    # Rinomina le colonne ai nomi finali più brevi e puliti
-    df.rename(columns={
-        'timestamp_col': 'timestamp',
-        'idsat_col': 'idsat',
-        'azimuth_col': 'azimuth',
-        'elevation_col': 'elevation',
-        'cn0_col': 'cn0',
-        's4c_col': 's4c'
-    }, inplace=True)
-
-    df['timestamp'] = pd.to_datetime(df['timestamp'], format='%y%m%d%H%M')
+    if df['time_num'].isna().any() is not None:
+        df['timestamp'] = pd.to_datetime(df['timestamp'], format='%y%m%d%H%M')
 
     print("Inizio filtraggio dati:")
 
@@ -229,6 +177,161 @@ def plot_snr_vs_time(file_path, azimut_range=None, elevation_range=None, idsat_l
         print('Nessun dato con la colonna timestamp trovato dopo i filtri')
 
 
+def plot_s4c_vs_time(file_path, azimut_range=None, elevation_range=None, idsat_list=None, max_sats=None,
+                     hours_per_plot=24, cn0_mask=None):  # cn0_mask applicato anche qui per coerenza nel filtro
+
+    try:
+        df = pd.read_csv(file_path)
+        if df.columns[0] != 'timestamp':
+            # missing header, add a new one:
+            print("This CSV has no header, applying a new one")
+            dtypes = {'timestamp': str, 'idsat': int, 'azimuth': float, 'elevation': float, 'cn0': float,
+                      's4c': float, 'time_num': float}
+            cols = list(dtypes.keys())
+            df = pd.read_csv(file_path, header=None, names=cols, dtype=dtypes)
+
+    except FileNotFoundError:
+        print(f"Errore: File '{file_path}' non trovato.")
+        return
+
+    if df['time_num'].isna().any() is not None:
+        df['timestamp'] = pd.to_datetime(df['timestamp'], format='%y%m%d%H%M')
+
+    print("Inizio filtraggio dati per S4C:")
+    if azimut_range is not None:
+        df = df[(df['azimuth'] >= azimut_range[0]) & (df['azimuth'] <= azimut_range[1])]
+    if elevation_range is not None:
+        df = df[(df['elevation'] >= elevation_range[0]) & (df['elevation'] <= elevation_range[1])]
+
+    if max_sats:
+        sat_counts = df['idsat'].value_counts()
+        top_sats = sat_counts.nlargest(max_sats).index.tolist()
+        df = df[df['idsat'].isin(top_sats)]
+        print(f"IDSAT considerati (args.max_sats = {max_sats}): {top_sats}")
+
+    if idsat_list:
+        df = df[df['idsat'].isin(idsat_list)]
+        print(f"IDSAT considerati (da linea di comando): {idsat_list}")
+
+    if cn0_mask is not None:
+        initial_rows = len(df)
+        df = df[df['cn0'] > cn0_mask]
+        print(f"Filtrato CN0 anche per S4C: rimosse {initial_rows - len(df)} righe con CN0 <= {cn0_mask}.")
+
+    if 'timestamp' in df.columns and not df.empty:
+        df['timestamp'] = pd.to_datetime(df['timestamp']).dt.tz_localize(None)
+        df = df.sort_values('timestamp')
+        df = df.reset_index(drop=True)
+        df['time_num'] = mdates.date2num(df['timestamp'])
+
+        base_filename = os.path.splitext(os.path.basename(file_path))[0]
+        output_filename = f"{base_filename}_filtered_s4c_max.csv"  # Nome file filtrato specifico per S4C MAX
+        df.to_csv(output_filename, index=False)
+        print(f"File filtrato S4C salvato come: {output_filename}")
+
+        start_time = df['timestamp'].min()
+        end_time = df['timestamp'].max()
+
+        total_hours = (end_time - start_time).total_seconds() / 3600
+        num_plots = int(total_hours / hours_per_plot)
+        if total_hours % hours_per_plot != 0:
+            num_plots += 1
+
+        print(
+            f"I dati S4C coprono {total_hours:.2f} ore. Verranno generati {num_plots} grafici da {hours_per_plot} ore ciascuno.")
+
+        for i in range(num_plots):
+            plot_start_time = start_time + pd.Timedelta(hours=i * hours_per_plot)
+            plot_end_time = plot_start_time + pd.Timedelta(hours=hours_per_plot)
+
+            df_plot = df[(df['timestamp'] >= plot_start_time) & (df['timestamp'] < plot_end_time)].copy()
+
+            # Calcola il valore massimo di s4c per ogni timestamp
+            # Per il caso in cui ci sia un solo valore per timestamp, max() lo restituirà.
+            # Se ci sono più satelliti nello stesso timestamp, prenderà il massimo tra loro.
+            max_s4c_per_time = df_plot.groupby('time_num')['s4c'].max().reset_index()
+
+            if not max_s4c_per_time.empty:
+                fig, ax = plt.subplots(figsize=(12, 6))
+
+                # Plotta solo il valore massimo di s4c nel tempo
+                ax.plot(max_s4c_per_time['time_num'], max_s4c_per_time['s4c'],
+                        marker='.', linestyle='-', color='blue', label='Max S4C')
+
+                ax.legend(loc='upper right')
+
+                # Il cursore non è utile per una singola linea "Max S4C" a meno che non si voglia il valore esatto.
+                # Se lo si vuole, si può riattivare e adattare. Per ora, lo lascio commentato o gestito diversamente.
+                # cursor = Cursor(ax, useblit=True, color='red', linewidth=1)
+
+                # Annotazione per il hover sulla singola linea
+                annot = ax.annotate("", xy=(0, 0), xytext=(20, 20), textcoords="offset points",
+                                    bbox=dict(boxstyle="round", fc="w"),
+                                    arrowprops=dict(arrowstyle="->"))
+                annot.set_visible(False)
+
+                def hover_max_s4c(event):
+                    if event.inaxes == ax:
+                        # Find the nearest point on the line
+                        contains, details = ax.lines[0].contains(event)
+                        if contains:
+                            ind = details['ind'][0]
+                            x, y = ax.lines[0].get_data()
+                            timestamp_val = mdates.num2date(x[ind]).strftime('%Y-%m-%d %H:%M:%S')
+                            s4c_val = y[ind]
+                            annot.xy = (x[ind], y[ind])
+                            annot.set_text(f"Orario: {timestamp_val}\nMax S4C: {s4c_val:.2f}")
+                            annot.set_visible(True)
+                            fig.canvas.draw_idle()
+                            return
+                    annot.set_visible(False)
+                    fig.canvas.draw_idle()
+
+                fig.canvas.mpl_connect("motion_notify_event", hover_max_s4c)
+
+
+            else:
+                print(
+                    f"Nessun dato MAX S4C da plottare per l'intervallo {plot_start_time} - {plot_end_time} dopo i filtri.")
+                plt.close(fig)
+                continue
+
+            ax.set_xlabel('Orario')
+            ax.set_ylabel('s4c (Valore Massimo)')  # Etichetta aggiornata
+
+            title = f'Valore Massimo s4c nel tempo ({plot_start_time.strftime("%Y-%m-%d %H:%M")} a {plot_end_time.strftime("%Y-%m-%d %H:%M")})'  # Titolo aggiornato
+            if azimut_range:
+                title += f', Azimut: {azimut_range[0]}-{azimut_range[1]}'
+            if elevation_range:
+                title += f', Elevazione: {elevation_range[0]}-{elevation_range[1]}'
+            if max_sats:
+                title += f', Max Sats considerati: {max_sats}'
+            if idsat_list:
+                title += f', IDSAT considerati: {idsat_list}'
+            if cn0_mask is not None:
+                title += f', CN0 > {cn0_mask}'
+
+            ax.set_title(title)
+
+            locator = mdates.AutoDateLocator()
+            formatter = mdates.DateFormatter('%Y-%m-%d %H:%M:%S')
+            ax.xaxis.set_major_locator(locator)
+            ax.xaxis.set_major_formatter(formatter)
+
+            plt.xticks(rotation=45)
+            plt.grid(True)
+            plt.tight_layout()
+
+            png_filename = f"{base_filename}_s4c_max_part{i + 1}.png"  # Nome file specifico per S4C MAX
+            plt.savefig(png_filename)
+            print(f"Grafico Max S4C salvato come: {png_filename}")
+
+            plt.close(fig)
+
+    else:
+        print('Nessun dato con la colonna timestamp trovato dopo i filtri per S4C')
+
+
 def main():
     parser = argparse.ArgumentParser(description='Genera un grafico dell\'SNR nel tempo da un file CSV.')
     parser.add_argument('file_path', type=str, help='Il percorso del file CSV.')
@@ -256,6 +359,7 @@ def main():
     cn0_mask = args.mask  # Recupera il valore della maschera
 
     plot_snr_vs_time(args.file_path, azimut_range, elevation_range, idsat_list, max_sats, hours_per_plot, cn0_mask)
+    plot_s4c_vs_time(args.file_path, azimut_range, elevation_range, idsat_list, max_sats, hours_per_plot, cn0_mask)
 
 
 if __name__ == '__main__':
