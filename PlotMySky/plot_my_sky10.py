@@ -347,8 +347,8 @@ def main():
                         help='Numero di ore da plottare in ciascun grafico (default: 24).')
     parser.add_argument('--mask', type=float,
                         help='Valore CN0 minimo. Ignora i valori di CN0 inferiori o uguali a N.')  
-    parser.add_argument('--show_max', type=bool,
-                        help='Visualizza il cn0 massimo')  # NUOVO ARGOMENTO
+    parser.add_argument('--show_max', action='store_true',
+                        help='Visualizza il cn0 massimo')
 
     args = parser.parse_args()
 
