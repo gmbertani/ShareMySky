@@ -13,13 +13,14 @@ import sys
 from datetime import datetime, timedelta
 from pathlib import Path
 
+APPVERSION="0.2"
 
 def parse_arguments():
     """
     Gestisce i parametri da linea di comando.
     """
     parser = argparse.ArgumentParser(description="Acquisisce dati GPS da porta seriale e li salva in un file CSV per "
-                                                 "le finalità del progetto Share My Sky")
+                                                 f"le finalità del progetto Share My Sky. Versione {APPVERSION}")
 
     # Parametri obbligatori
     parser.add_argument("station", type=str,
@@ -35,8 +36,8 @@ def parse_arguments():
     parser.add_argument("--csv_path", type=str, default=Path.home(),
                         help=f"Percorso del file CSV dove verranno registrati i dati raccolti da GPS (default: {Path.home()})")
 
-    parser.add_argument("--max_sats", type=str, default=33,
-                        help=f"Massimo numero di satelliti da considerare, default 33")
+    parser.add_argument("--max_sats", type=str, default=32,
+                        help=f"Massimo numero di satelliti da considerare, default 32")
     parser.add_argument("--silent", action="store_true", default=False,
                         help="Se specificato, disabilita la stampa dei dati sulla console")
     # parser.add_argument("--window", type=int, default=60,
@@ -204,9 +205,9 @@ def main():
     print("\n\nDati ricevitore:")
     print("\nStart ", timesat_old, " coordinate: ", lat, "-", lon, "\n")
 
-    azsatvet = array(args.max_sats)
-    altsatvet = array(args.max_sats)
-    cn0satvet = array(args.max_sats)
+    azsatvet = array(int(args.max_sats))
+    altsatvet = array(int(args.max_sats))
+    cn0satvet = array(int(args.max_sats))
 
     while True:
         try:
@@ -229,7 +230,7 @@ def main():
                 # al secondo 00 esegue la statistica e logga i risultati
                 if second == "00":
                     # calcolo delle coordinate medie e dell sqm del segnale per ogni satellite valido
-                    for t in range(0, args.max_sats):
+                    for t in range(0, int(args.max_sats)):
                         if len(cn0satvet[t]) > 0:
                             azmed = int(med(azsatvet[t]) * 10 + 0.5) / 10
                             altmed = int(med(altsatvet[t]) * 10 + 0.5) / 10
@@ -252,9 +253,9 @@ def main():
                             f.close()
 
                     # vuota gli array
-                    azsatvet = array(args.max_sats)
-                    altsatvet = array(args.max_sats)
-                    cn0satvet = array(args.max_sats)
+                    azsatvet = array(int(args.max_sats))
+                    altsatvet = array(int(args.max_sats))
+                    cn0satvet = array(int(args.max_sats))
                     timesat_old = timesat
 
             # decodifica il codice nmea0183 GPGSV
@@ -270,7 +271,7 @@ def main():
                         # calcola la finestra di cutoff
                         if is_within_cutoff(azsat, altsat, azimuth_start, azimuth_end, elevation_start,
                                             elevation_end):
-                            if idsat < args.max_sats:
+                            if idsat < int(args.max_sats):
                                 azsatvet[idsat] = azsatvet[idsat] + [azsat]
                                 altsatvet[idsat] = altsatvet[idsat] + [altsat]
                                 cn0satvet[idsat] = cn0satvet[idsat] + [cn0sat]
