@@ -1,16 +1,16 @@
-import serial
+import serial, config_gps_s4c
 
 # costanti
-DEVICE='/dev/ttyACM0'
-DIR_FILE="/mnt/ramdisk/"
-STATION_NAME="tom"
-args.max_sats=33
+DEVICE=config_gps_s4c.DEVICE
+DIR_FILE=config_gps_s4c.DIR_FILE
+STATION_NAME=config_gps_s4c.STATION_NAME
+MAX_SAT=config_gps_s4c.MAX_SAT
 
 # finestra cutoff
-AZ_da=0
-AZ_a=360
-ALT_min=45
-ALT_max=90
+AZ_da=config_gps_s4c.AZ_da
+AZ_a=config_gps_s4c.AZ_a
+ALT_min=config_gps_s4c.ALT_min
+ALT_max=config_gps_s4c.ALT_max
 
 
 
@@ -94,52 +94,107 @@ while (second!="00"):
 		second=s[1][-5:-3]
 		lat=str(int(float(s[3]))/100)+" "+s[4]
 		lon=str(int(float(s[5]))/100)+" "+s[6]
+		
 
+STATION_POS=str(int(float(s[3])))+s[4]+str(int(float(s[5])))+s[6]	
 print ()
-
 print("Start ",timesat_old," coordinate: ",lat,"-",lon,"\n")
 
 
 # crea gli array vuoti
-azsatvet=array (args.max_sats)
-altsatvet=array (args.max_sats)
-cn0satvet=array (args.max_sats)
+azsatvet=array (MAX_SAT)
+altsatvet=array (MAX_SAT)
+cn0satvet=array (MAX_SAT)
+
+# crea gli array vuoti per le coordinate
+lat=0
+lon=0
+alt=0
+latv=[]
+lonv=[]
+altv=[]
+
 
 while (True):
 		
 		# legge nmea0183 da seriale
 		s=readgps()
 		
+		#legge il frame GGA per le coordinate
+		if (s[0]=='$GPGGA'):
+			lat= int((int(float(s[2])/100) + ( float(s[2])/100 - int(float(s[2])/100))*100/60) *1000000)/1000000
+			if (s[3]=='S'):
+				lat=-lat	
+			lon=int((int(float(s[4])/100) + ( float(s[4])/100 - int(float(s[4])/100))*100/60) *1000000)/1000000
+			if (s[5]=='W'):
+				lon=-lon
+			alt=float(s[9])
+			latv=latv+[lat]
+			lonv=lonv+[lon]
+			altv=altv+[alt]
+		
+		
+		
 		# decodifica il codice nmea0182 GPRMC
 		if (s[0]=='$GPRMC'):
 			date=s[9][4:6]+s[9][2:4]+s[9][0:2]
 			timesat=s[9][4:6]+s[9][2:4]+s[9][0:2]+s[1][:-5]
+			hour=s[1][-9:-7]
+			minute=s[1][-7:-5]
 			second=s[1][-5:-3]
+			
 			
 			# al secondo 00 esegue la statistica e logga i risultati
 			if (second=="00"):
-				# calcolo delle coordinate medie e dell sqm del segnale per ogni satellite valido		
-				for t in range (0,args.max_sats):
+				
+				# calcola e scrive il file della posizione
+				latm=int(sum(latv)/len(latv)*1000000)/1000000
+				lonm=int(sum(lonv)/len(lonv)*1000000)/1000000
+				altm=int(sum(altv)/len(altv)*10)/10
+				latv=[]
+				lonv=[]
+				altv=[]
+				POSFILE=DIR_FILE+"sms_pos_"+STATION_NAME+".csv"
+				f=open(POSFILE,"a")
+				s=str(timesat_old)+","+str(latm)+","+str(lonm)+","+str(altm)+"\n"
+				print (s)
+				f.write (s)
+				f.close()
+				
+				# calcolo delle coordinate medie e dell s4c del segnale per ogni satellite valido		
+				for t in range (0,MAX_SAT):
 					if (len(cn0satvet[t])>0):
 						azmed=int(med(azsatvet[t])*10+0.5)/10
 						altmed=int(med(altsatvet[t])*10+0.5)/10
 						cn0med=int(med(cn0satvet[t])*10+0.5)/10
 						cn0s4c=s4c(cn0satvet[t])
+						
 						cn0s=""
-						for x in range(int(cn0s4c/0.333)):
-							cn0s=cn0s+"*"
+						if (cn0s4c>0.25):
+							for x in range(int(cn0s4c/0.25)-1):
+								cn0s=cn0s+"*"
 						
 						print (f'{timesat_old:6}  sat: {t:2}   az: {azmed:5}   alt: {altmed:4}   cn0: {cn0med:4}   s4c:{cn0s4c:5} {cn0s}')
-						LOG_FILE=DIR_FILE+"gps_"+STATION_NAME+"_"+date+".csv"
+						
+						# esegue il log sul file giornaliero
+						LOG_FILE=DIR_FILE+"sms_"+STATION_NAME+"_"+STATION_POS+"_"+timesat_old[:6]+".csv"
 						f=open(LOG_FILE,"a")
 						s1=str(timesat_old)+","+str(t)+","+str(azmed)+","+str(altmed)+","+str(cn0med)+","+str(cn0s4c)+"\n"
 						f.write (s1)
 						f.close()
+						
+						# esegue il log sul file dei topevent
+						if (cn0s4c>0.5):
+							LOG_FILE=DIR_FILE+"sms_"+STATION_NAME+"_"+STATION_POS+"_topevent.csv"
+							f=open(LOG_FILE,"a")
+							f.write (s1)
+							f.close()
+							
 				print ()
 				# vuota gli array
-				azsatvet=array (args.max_sats)
-				altsatvet=array (args.max_sats)
-				cn0satvet=array (args.max_sats)
+				azsatvet=array (MAX_SAT)
+				altsatvet=array (MAX_SAT)
+				cn0satvet=array (MAX_SAT)
 				timesat_old=timesat
 		
 	
@@ -152,6 +207,7 @@ while (True):
 				altsat=int(s[t*4+1])
 				azsat=int(s[t*4+2])
 				cn0sat=int(s[t*4+3])
+				
 			
 				# calcola la finestra di cutoff
 				if AZ_da<=AZ_a:
@@ -160,7 +216,7 @@ while (True):
 					cutoffarea=(azsat>=AZ_da or azsat<=AZ_a) and (altsat>=ALT_min and altsat<=ALT_max)
 				
 				# memorizza i valori dei satelliti validi
-				if ((cutoffarea==True) and (idsat<args.max_sats)):
+				if ((cutoffarea==True) and (idsat<MAX_SAT)):
 					azsatvet[idsat]=azsatvet[idsat]+[azsat]
 					altsatvet[idsat]=altsatvet[idsat]+[altsat]
 					cn0satvet[idsat]=cn0satvet[idsat]+[cn0sat]	

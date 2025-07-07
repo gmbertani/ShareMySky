@@ -1,0 +1,1 @@
+DIST\sms MAX COM6: 100-160 30-80
